@@ -92,7 +92,7 @@
         <!-- Main Game Interface -->
         <div id="game-screen" class="hidden flex flex-col lg:flex-row">
             
-            <!-- Left Panel: Control & Tasks (Widened to show more text) -->
+            <!-- Left Panel: Control & Tasks -->
             <div class="w-full lg:w-5/12 p-6 bg-slate-50 border-r-2 border-slate-100 flex flex-col">
                 <div id="player-board" class="grid grid-cols-2 lg:grid-cols-1 gap-3 mb-6">
                     <!-- Player status cards injected here -->
@@ -109,7 +109,7 @@
                         <div id="input-lock-overlay" class="absolute inset-0 z-10 bg-slate-100/80 flex items-center justify-center rounded-xl font-bold text-slate-500 text-center px-4 italic border-2 border-dashed border-slate-300">
                             🎤 Bitte klicke zuerst auf das Mikrofon und sprich den Satz...
                         </div>
-                        <!-- Changed from input to textarea to allow multiline view -->
+                        <!-- Multiline textarea for long German sentences -->
                         <textarea id="answer-input" placeholder="Warte auf Spracheingabe..." disabled
                                class="w-full p-4 border-2 border-slate-200 rounded-xl focus:border-green-500 outline-none transition-all text-xl bg-slate-50 min-h-[120px] resize-none overflow-y-auto font-medium"
                         ></textarea>
@@ -138,7 +138,7 @@
                 </button>
             </div>
 
-            <!-- Right Panel: The Digging Grid (Adjusted size) -->
+            <!-- Right Panel: The Digging Grid -->
             <div class="w-full lg:w-7/12 p-6 bg-white overflow-hidden flex flex-col">
                 <div class="mb-4 flex justify-between items-center bg-slate-50 p-3 rounded-lg border border-slate-200">
                     <h3 id="grid-status-text" class="text-lg font-bold text-slate-700 flex items-center gap-2">
@@ -164,6 +164,7 @@
     <script>
         /**
          * Language Content Array
+         * Updated mapping: 'take' -> 'nehmen', 'would like' -> 'möchten/hätte gern'.
          */
         const sentencePairs = [
             { de: "Ich esse gern eine Pizza, denn sie ist lecker.", en: "I like eating pizza because it is tasty." },
@@ -187,12 +188,12 @@
             { de: "Ich trinke gern ein Sprudelwasser, denn es schmeckt gut.", en: "I like drinking fizzy water because it tastes good." },
             { de: "Ich trinke gern eine Milch, denn sie ist kalt.", en: "I like drinking milk because it is cold." },
             { de: "Zum Frühstück esse ich gern ein Brötchen, denn es ist frisch.", en: "For breakfast, I like eating a bread roll because it is fresh." },
-            { de: "Zum Frühstück habe ich gern ein Ei, denn es ist lecker.", en: "For breakfast, I like eating an egg because it is tasty." },
+            { de: "Zum Frühstück habe ich gern ein Ei, denn es ist lecker.", en: "For breakfast, I would like an egg because it is tasty." },
             { de: "Zum Frühstück esse ich gern ein Brot, denn es schmeckt gut.", en: "For breakfast, I like eating bread because it tastes good." },
             { de: "Zum Frühstück trinke ich gern einen Tee, denn er ist heiß.", en: "For breakfast, I like drinking tea because it is hot." },
             { de: "Zum Frühstück trinke ich lieber einen Orangensaft, denn er ist süß.", en: "For breakfast, I prefer drinking orange juice because it is sweet." },
             { de: "Zum Frühstück trinke ich am liebsten eine heiße Schokolade, denn sie ist köstlich.", en: "For breakfast, I like drinking hot chocolate best because it is delicious." },
-            { de: "Zum Frühstück nehme ich ein Brötchen und einen Apfelsaft.", en: "For breakfast, I will have a bread roll and an apple juice." },
+            { de: "Zum Frühstück nehme ich ein Brötchen und einen Apfelsaft.", en: "For breakfast, I take a bread roll and an apple juice." },
             { de: "Zum Frühstück hätte ich gern ein Ei und eine Milch.", en: "For breakfast, I would like an egg and a milk." },
             { de: "Zum Frühstück esse ich nicht gern eine Wurst, denn sie ist salzig.", en: "For breakfast, I do not like eating sausage because it is salty." },
             { de: "Zum Frühstück trinke ich nicht gern einen Kaffee, denn er schmeckt ekelhaft.", en: "For breakfast, I do not like drinking coffee because it tastes disgusting." },
@@ -204,7 +205,7 @@
             { de: "Zum Mittagessen esse ich gern Gemüse, denn es ist gesund.", en: "For lunch, I like eating vegetables because they are healthy." },
             { de: "Zum Mittagessen esse ich nicht gern einen Fisch, denn er schmeckt ekelhaft.", en: "For lunch, I do not like eating fish because it tastes disgusting." },
             { de: "Zum Mittagessen esse ich nicht gern eine Gurke, denn sie schmeckt nicht gut.", en: "For lunch, I do not like eating cucumber because it does not taste good." },
-            { de: "Zum Mittagessen nehme ich einen Salat und ein Wasser.", en: "For lunch, I will have a salad and a water." },
+            { de: "Zum Mittagessen nehme ich einen Salat und ein Wasser.", en: "For lunch, I take a salad and a water." },
             { de: "Zum Mittagessen hätte ich gern eine Suppe und ein Brötchen.", en: "For lunch, I would like a soup and a bread roll." },
             { de: "Zum Abendessen esse ich gern Bratkartoffeln, denn sie schmecken gut.", en: "For dinner, I like eating fried potatoes because they taste good." },
             { de: "Zum Abendessen esse ich gern eine Kartoffel, denn sie ist lecker.", en: "For dinner, I like eating a potato because it is tasty." },
@@ -214,7 +215,7 @@
             { de: "Zum Abendessen esse ich nicht gern eine Paprika, denn sie ist scharf.", en: "For dinner, I do not like eating pepper because it is spicy." },
             { de: "Zum Abendessen esse ich nicht gern Fleisch, denn es schmeckt nicht gut.", en: "For dinner, I do not like eating meat because it does not taste good." },
             { de: "Zum Abendessen trinke ich lieber ein Wasser, denn es ist gesund.", en: "For dinner, I prefer drinking water because it is healthy." },
-            { de: "Zum Abendessen nehme ich eine Pizza und eine Cola.", en: "For dinner, I will have a pizza and a coke." },
+            { de: "Zum Abendessen nehme ich eine Pizza und eine Cola.", en: "For dinner, I take a pizza and a coke." },
             { de: "Zum Abendessen hätte ich gern einen Kuchen und einen Kaffee.", en: "For dinner, I would like a cake and a coffee." }
         ];
 
@@ -230,7 +231,6 @@
         let timeLeft = 300; 
         let timerInterval = null;
 
-        // Web Speech API initialisation
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         let recognition = null;
         let isRecognitionActive = false;
@@ -404,11 +404,19 @@
             recognition.start();
         }
 
+        /**
+         * Normalises strings for comparison.
+         * Generous rule added: "lecker", "schmeckt", "schmeckt gut" are all treated as "tasty" marker.
+         */
         function normalise(str) {
             return str.toLowerCase()
                 .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, "")
                 .replace(/gerne/g, "gern")
                 .replace(/\b(ein|eine|einen)\b/g, "")
+                // Treat "denn sie ist lecker", "denn sie schmeckt", "denn sie schmeckt gut" as synonyms
+                .replace(/\bdenn (er|sie|es|sie) schmeckt( gut)?\b/g, "SENTENCE_TASTY")
+                .replace(/\bdenn (er|sie|es|sie) ist lecker\b/g, "SENTENCE_TASTY")
+                // General pronoun + verb normalization
                 .replace(/\bdenn (er|sie|es|sie) (ist|sind)\b/g, "denn ist")
                 .replace(/\s+/g, " ")
                 .trim();
