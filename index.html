@@ -164,7 +164,8 @@
     <script>
         /**
          * Language Content Array
-         * Updated mapping: 'take' -> 'nehmen', 'would like' -> 'möchten/hätte gern'.
+         * UK spelling: randomise, initialise.
+         * Constraints: 'take' for 'nehmen', 'would like' for 'möchten'. No 'will take'.
          */
         const sentencePairs = [
             { de: "Ich esse gern eine Pizza, denn sie ist lecker.", en: "I like eating pizza because it is tasty." },
@@ -188,7 +189,7 @@
             { de: "Ich trinke gern ein Sprudelwasser, denn es schmeckt gut.", en: "I like drinking fizzy water because it tastes good." },
             { de: "Ich trinke gern eine Milch, denn sie ist kalt.", en: "I like drinking milk because it is cold." },
             { de: "Zum Frühstück esse ich gern ein Brötchen, denn es ist frisch.", en: "For breakfast, I like eating a bread roll because it is fresh." },
-            { de: "Zum Frühstück habe ich gern ein Ei, denn es ist lecker.", en: "For breakfast, I would like an egg because it is tasty." },
+            { de: "Zum Frühstück hätte ich gern ein Ei, denn es ist lecker.", en: "For breakfast, I would like an egg because it is tasty." },
             { de: "Zum Frühstück esse ich gern ein Brot, denn es schmeckt gut.", en: "For breakfast, I like eating bread because it tastes good." },
             { de: "Zum Frühstück trinke ich gern einen Tee, denn er ist heiß.", en: "For breakfast, I like drinking tea because it is hot." },
             { de: "Zum Frühstück trinke ich lieber einen Orangensaft, denn er ist süß.", en: "For breakfast, I prefer drinking orange juice because it is sweet." },
@@ -231,6 +232,7 @@
         let timeLeft = 300; 
         let timerInterval = null;
 
+        // Web Speech API initialisation
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         let recognition = null;
         let isRecognitionActive = false;
@@ -387,6 +389,9 @@
             input.classList.add('bg-slate-50');
             submitBtn.disabled = true;
             lockOverlay.classList.remove('hidden');
+            
+            // FIX: Re-enable the microphone button for the new player
+            micBtn.disabled = false;
             micBtn.classList.add('mic-highlight');
 
             document.getElementById('feedback-area').innerHTML = '<p class="text-slate-400 italic text-lg">Nutze zuerst das Mikrofon!</p>';
