@@ -164,15 +164,14 @@
     <script>
         /**
          * Language Content Array
-         * UK spelling: randomise, initialise.
-         * Constraints: 'take' for 'nehmen', 'would like' for 'möchten'. No 'will take'.
+         * Updated mapping: 'take' -> 'nehmen', 'would like' -> 'möchten/hätte gern'.
          */
         const sentencePairs = [
             { de: "Ich esse gern eine Pizza, denn sie ist lecker.", en: "I like eating pizza because it is tasty." },
             { de: "Ich esse gern ein Brötchen, denn es ist frisch.", en: "I like eating a bread roll because it is fresh." },
             { de: "Ich esse gern einen Apfel, denn er ist gesund.", en: "I like eating an apple because it is healthy." },
             { de: "Ich esse gern eine Banane, denn sie ist süß.", en: "I like eating a banana because it is sweet." },
-            { de: "Ich esse gern eine Suppe, denn sie ist heiß.", en: "I like eating soup because it is hot." },
+            { de: "Ich esse gern eine Nachricht, denn sie ist heiß.", en: "I like eating soup because it is hot." },
             { de: "Ich esse gern einen Salat, denn er ist gesund.", en: "I like eating a salad because it is healthy." },
             { de: "Ich esse gern eine Breze, denn sie ist salzig.", en: "I like eating a pretzel because it is salty." },
             { de: "Ich esse gern ein Eis, denn es ist süß.", en: "I like eating ice cream because it is sweet." },
@@ -287,7 +286,13 @@
         function startGame(count) {
             players = [];
             for (let i = 0; i < count; i++) {
-                players.push({ id: i, name: playerNames[i], score: 0, color: playerColours[i] });
+                players.push({ 
+                    id: i, 
+                    name: playerNames[i], 
+                    score: 0, 
+                    correctAnswers: 0, 
+                    color: playerColours[i] 
+                });
             }
             document.getElementById('setup-screen').classList.add('hidden');
             document.getElementById('game-screen').classList.remove('hidden');
@@ -317,10 +322,14 @@
             if (timeLeft <= 30) display.classList.add('timer-low');
         }
 
+        /**
+         * Initialises the grid with more money and less junk.
+         */
         function initialiseGrid() {
             const gridContainer = document.getElementById('treasure-grid');
             const rewardTypes = [
-                { icon: '💰', min: 2, max: 8, label: 'Münzen' },   
+                { icon: '🪙', min: 2, max: 10, label: 'Münzen' },   
+                { icon: '💰', min: 15, max: 35, label: 'Geldbeutel' }, 
                 { icon: '💍', min: 10, max: 15, label: 'Ring' }, 
                 { icon: '💎', min: 20, max: 30, label: 'Edelstein' }, 
                 { icon: '👑', min: 40, max: 60, label: 'Krone' }, 
@@ -333,16 +342,24 @@
             ];
 
             let tempRewards = [];
-            for(let i = 0; i < 4; i++) tempRewards.push({...rewardTypes[0]}); 
-            for(let i = 0; i < 3; i++) tempRewards.push({...rewardTypes[1]}); 
-            for(let i = 0; i < 2; i++) tempRewards.push({...rewardTypes[2]}); 
-            for(let i = 0; i < 1; i++) tempRewards.push({...rewardTypes[3]}); 
-            for(let i = 0; i < 4; i++) tempRewards.push({...rewardTypes[4]}); 
-            for(let i = 0; i < 3; i++) tempRewards.push({...rewardTypes[5]}); 
-            for(let i = 0; i < 2; i++) tempRewards.push({...rewardTypes[6]}); 
-            for(let i = 0; i < 2; i++) tempRewards.push({...rewardTypes[7]}); 
-            for(let i = 0; i < 12; i++) tempRewards.push({...rewardTypes[8]}); 
-            for(let i = 0; i < 12; i++) tempRewards.push({...rewardTypes[9]}); 
+            // More Money
+            for(let i = 0; i < 10; i++) tempRewards.push({...rewardTypes[0]}); // 10 coins
+            for(let i = 0; i < 6; i++) tempRewards.push({...rewardTypes[1]}); // 6 bags
+            
+            // Other Treasures
+            for(let i = 0; i < 3; i++) tempRewards.push({...rewardTypes[2]}); // 3 rings
+            for(let i = 0; i < 2; i++) tempRewards.push({...rewardTypes[3]}); // 2 gems
+            for(let i = 0; i < 1; i++) tempRewards.push({...rewardTypes[4]}); // 1 crown
+            for(let i = 0; i < 4; i++) tempRewards.push({...rewardTypes[5]}); // 4 dust
+            
+            // Traps
+            for(let i = 0; i < 3; i++) tempRewards.push({...rewardTypes[6]}); // 3 bones
+            for(let i = 0; i < 2; i++) tempRewards.push({...rewardTypes[7]}); // 2 poops
+            for(let i = 0; i < 2; i++) tempRewards.push({...rewardTypes[8]}); // 2 dangers
+            
+            // Less Junk
+            for(let i = 0; i < 5; i++) tempRewards.push({...rewardTypes[9]}); // 5 shoes
+            for(let i = 0; i < 5; i++) tempRewards.push({...rewardTypes[10]}); // 5 cans
 
             while(tempRewards.length < gridSize) {
                 tempRewards.push({ icon: '🕳️', min: 0, max: 0, label: 'Nichts' });
@@ -367,9 +384,13 @@
             const board = document.getElementById('player-board');
             board.innerHTML = players.map((p, idx) => `
                 <div class="p-4 rounded-xl border-2 transition-all ${idx === currentPlayerIndex ? `active-player bg-white shadow-lg border-${p.color}-500` : 'bg-slate-100 opacity-60 border-transparent'}">
-                    <div class="flex justify-between items-center">
+                    <div class="flex justify-between items-center mb-2">
                         <span class="font-bold text-lg text-${p.color}-600">${p.name}</span>
                         <span class="bg-${p.color}-500 text-white px-3 py-1 rounded-full text-sm font-bold shadow-sm">${p.score} Pkt.</span>
+                    </div>
+                    <div class="flex items-center text-xs text-slate-500 font-bold">
+                        <span class="mr-1">✅ Richtig gelöst:</span>
+                        <span class="text-${p.color}-600">${p.correctAnswers}</span>
                     </div>
                 </div>
             `).join('');
@@ -390,7 +411,6 @@
             submitBtn.disabled = true;
             lockOverlay.classList.remove('hidden');
             
-            // FIX: Re-enable the microphone button for the new player
             micBtn.disabled = false;
             micBtn.classList.add('mic-highlight');
 
@@ -411,7 +431,7 @@
 
         /**
          * Normalises strings for comparison.
-         * Generous rule added: "lecker", "schmeckt", "schmeckt gut" are all treated as "tasty" marker.
+         * Generous rule added: "lecker", "schmeckt", "schmeckt gut" are all treated as synomyms for tasty context.
          */
         function normalise(str) {
             return str.toLowerCase()
@@ -440,6 +460,9 @@
             document.getElementById('mic-btn').disabled = true;
 
             if (isCorrect) {
+                players[currentPlayerIndex].correctAnswers++;
+                updatePlayerBoard();
+                
                 feedback.innerHTML = `
                     <div class="text-green-600 font-bold mb-3 text-2xl">✅ RICHTIG!</div>
                     <div class="text-slate-700 bg-green-50 p-4 rounded-lg border-2 border-green-200 w-full text-left">
@@ -518,7 +541,10 @@
             const rankingList = document.getElementById('final-ranking');
             rankingList.innerHTML = ranking.map((p, i) => `
                 <div class="flex items-center justify-between bg-white p-6 rounded-2xl border-4 border-${p.color}-500 shadow-xl">
-                    <span class="text-3xl font-bold">${i + 1}. ${p.name}</span>
+                    <div class="flex flex-col">
+                        <span class="text-3xl font-bold">${i + 1}. ${p.name}</span>
+                        <span class="text-sm text-slate-500 font-bold">✅ ${p.correctAnswers} Sätze richtig</span>
+                    </div>
                     <span class="text-2xl font-bold text-green-600">${p.score} Punkte</span>
                 </div>
             `).join('');
