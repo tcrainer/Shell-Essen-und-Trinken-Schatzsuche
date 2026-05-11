@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schatzsuche: Das Übersetzungsspiel</title>
+    <!-- External Dependencies: Tailwind CSS and Google Fonts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Quicksand:wght@400;700&display=swap');
+        
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background-color: #f0fdf4;
+            overscroll-behavior: none;
+        }
+        .title-font {
+            font-family: 'Fredoka One', cursive;
+        }
+        .grid-tile {
+            transition: all 0.2s ease;
+            perspective: 1000px;
+        }
+        .grid-tile:not(.revealed):hover {
+            transform: scale(1.05);
+            filter: brightness(1.1);
+        }
+        .treasure-reveal {
+            animation: bounce 0.5s ease-out;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .active-player {
+            ring: 4px solid #16a34a;
+            transform: scale(1.05);
+        }
+        .timer-low {
+            color: #ef4444;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .mic-highlight {
+            animation: pulse-ring 1.5s infinite;
+        }
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4">
+
+    <div id="app" class="max-w-6xl mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden border-4 border-green-200">
+        <!-- Header Section -->
+        <header class="bg-green-600 p-4 md:p-6 text-white flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="text-center md:text-left">
+                <h1 class="text-3xl md:text-4xl title-font mb-1">💎 Schatzsuche 💎</h1>
+                <p class="text-green-100 italic text-sm md:text-base">Sprich zuerst, korrigiere dann und grabe!</p>
+            </div>
+            <div id="timer-display" class="bg-green-800 px-6 py-2 rounded-2xl text-2xl font-bold border-2 border-green-400 min-w-[120px] text-center shadow-inner">
+                05:00
+            </div>
+        </header>
+
+        <!-- Initial Setup Screen -->
+        <div id="setup-screen" class="p-10 text-center">
+            <h2 class="text-2xl font-bold mb-6 text-slate-700">Wie viele Abenteurer seid ihr?</h2>
+            <div class="flex justify-center gap-6">
+                <button onclick="startGame(2)" class="bg-blue-500 hover:bg-blue-600 text-white px-8 py-4 rounded-2xl text-xl font-bold shadow-lg transition-transform active:scale-95">2 Spieler</button>
+                <button onclick="startGame(3)" class="bg-purple-500 hover:bg-purple-600 text-white px-8 py-4 rounded-2xl text-xl font-bold shadow-lg transition-transform active:scale-95">3 Spieler</button>
+            </div>
+        </div>
+
+        <!-- Main Game Interface -->
+        <div id="game-screen" class="hidden flex flex-col lg:flex-row">
+            
+            <!-- Left Panel: Control & Tasks -->
+            <div class="w-full lg:w-1/3 p-6 bg-slate-50 border-r-2 border-slate-100 flex flex-col">
+                <div id="player-board" class="space-y-3 mb-6">
+                    <!-- Player status cards injected here -->
+                </div>
+
+                <div id="turn-info" class="bg-white p-4 rounded-xl border-2 border-slate-200 shadow-sm mb-4">
+                    <p class="text-slate-500 text-xs uppercase tracking-wider font-bold mb-1">Aufgabe (Englisch)</p>
+                    <p id="english-sentence" class="text-lg font-bold text-slate-800 leading-tight"></p>
+                </div>
+
+                <div id="input-section" class="space-y-3">
+                    <div class="relative">
+                        <!-- Visual lock to force microphone use first -->
+                        <div id="input-lock-overlay" class="absolute inset-0 z-10 bg-slate-100/60 flex items-center justify-center rounded-xl font-bold text-slate-500 text-sm italic border-2 border-dashed border-slate-300">
+                            🎤 Bitte zuerst sprechen...
+                        </div>
+                        <input type="text" id="answer-input" placeholder="Warte auf Spracheingabe..." disabled
+                               class="w-full p-4 border-2 border-slate-200 rounded-xl focus:border-green-500 outline-none transition-all text-lg bg-slate-50">
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <button id="submit-btn" onclick="checkAnswer()" disabled
+                                class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                            Prüfen
+                        </button>
+                        <button id="mic-btn" onclick="startSpeech()" 
+                                class="w-16 bg-red-500 hover:bg-red-600 text-white rounded-xl shadow-md flex items-center justify-center text-2xl transition-all mic-highlight">
+                            🎤
+                        </button>
+                    </div>
+                    <p id="speech-status" class="text-xs text-center text-slate-400 h-4 font-bold"></p>
+                </div>
+                
+                <div id="feedback-area" class="mt-4 p-4 rounded-xl flex-grow flex flex-col items-center justify-center text-center bg-white border border-slate-100 shadow-inner min-h-[150px]">
+                    <!-- Feedback logic renders here -->
+                </div>
+
+                <button id="continue-btn" onclick="nextTurn()" 
+                        class="hidden mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-all animate-pulse">
+                    Weiter ➔
+                </button>
+            </div>
+
+            <!-- Right Panel: The Digging Grid -->
+            <div class="w-full lg:w-2/3 p-6 bg-white overflow-hidden flex flex-col">
+                <div class="mb-4 flex justify-between items-center">
+                    <h3 id="grid-status-text" class="text-lg font-bold text-slate-700">Warte auf Stimme...</h3>
+                    <span id="dig-count" class="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-sm font-bold italic"></span>
+                </div>
+                <!-- 8x8 Dynamic Grid -->
+                <div id="treasure-grid" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 overflow-y-auto max-h-[600px] p-2">
+                    <!-- Tiles injected via JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- End Game Ranking Screen -->
+        <div id="finish-screen" class="hidden p-10 text-center">
+            <h2 class="text-4xl title-font mb-4 text-green-600">Spiel Beendet!</h2>
+            <div id="final-ranking" class="max-w-md mx-auto mb-8 space-y-4"></div>
+            <button onclick="location.reload()" class="bg-green-600 text-white px-8 py-4 rounded-2xl text-xl font-bold hover:bg-green-700 transition-colors">Nochmal spielen</button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * Language Content Array
+         * UK spelling logic applied to comments and internal labels.
+         */
+        const sentencePairs = [
+            { de: "Ich esse gern eine Pizza, denn sie ist lecker.", en: "I like eating pizza because it is tasty." },
+            { de: "Ich esse gern ein Brötchen, denn es ist frisch.", en: "I like eating a bread roll because it is fresh." },
+            { de: "Ich esse gern einen Apfel, denn er ist gesund.", en: "I like eating an apple because it is healthy." },
+            { de: "Ich esse gern eine Banane, denn sie ist süß.", en: "I like eating a banana because it is sweet." },
+            { de: "Ich esse gern eine Suppe, denn sie ist heiß.", en: "I like eating soup because it is hot." },
+            { de: "Ich esse gern einen Salat, denn er ist gesund.", en: "I like eating a salad because it is healthy." },
+            { de: "Ich esse gern eine Breze, denn sie ist salzig.", en: "I like eating a pretzel because it is salty." },
+            { de: "Ich esse gern ein Eis, denn es ist süß.", en: "I like eating ice cream because it is sweet." },
+            { de: "Ich esse gern einen Kuchen, denn er ist köstlich.", en: "I like eating cake because it is delicious." },
+            { de: "Ich esse gern eine Erdbeere, denn sie ist süß.", en: "I like eating a strawberry because it is sweet." },
+            { de: "Ich trinke gern ein Wasser, denn es ist gesund.", en: "I like drinking water because it is healthy." },
+            { de: "Ich trinke gern einen Tee, denn er ist heiß.", en: "I like drinking tea because it is hot." },
+            { de: "Ich trinke gern eine Cola, denn sie ist süß.", en: "I like drinking coke because it is sweet." },
+            { de: "Ich trinke gern einen Apfelsaft, denn er schmeckt gut.", en: "I like drinking apple juice because it tastes good." },
+            { de: "Ich trinke gern eine Limonade, denn sie schmeckt gut.", en: "I like drinking lemonade because it tastes good." },
+            { de: "Ich trinke gern eine heiße Schokolade, denn sie ist süß.", en: "I like drinking hot chocolate because it is sweet." },
+            { de: "Ich trinke gern einen Kaffee, denn er ist heiß.", en: "I like drinking coffee because it is hot." },
+            { de: "Ich trinke gern ein stilles Wasser, denn es ist gesund.", en: "I like drinking still water because it is healthy." },
+            { de: "Ich trinke gern ein Sprudelwasser, denn es schmeckt gut.", en: "I like drinking fizzy water because it tastes good." },
+            { de: "Ich trinke gern eine Milch, denn sie ist kalt.", en: "I like drinking milk because it is cold." },
+            { de: "Zum Frühstück esse ich gern ein Brötchen, denn es ist frisch.", en: "For breakfast, I like eating a bread roll because it is fresh." },
+            { de: "Zum Frühstück habe ich gern ein Ei, denn es ist lecker.", en: "For breakfast, I like eating an egg because it is tasty." },
+            { de: "Zum Frühstück esse ich gern ein Brot, denn es schmeckt gut.", en: "For breakfast, I like eating bread because it tastes good." },
+            { de: "Zum Frühstück trinke ich gern einen Tee, denn er ist heiß.", en: "For breakfast, I like drinking tea because it is hot." },
+            { de: "Zum Frühstück trinke ich lieber einen Orangensaft, denn er ist süß.", en: "For breakfast, I prefer drinking orange juice because it is sweet." },
+            { de: "Zum Frühstück trinke ich am liebsten eine heiße Schokolade, denn sie ist köstlich.", en: "For breakfast, I like drinking hot chocolate best because it is delicious." },
+            { de: "Zum Frühstück nehme ich ein Brötchen und einen Apfelsaft.", en: "For breakfast, I will have a bread roll and an apple juice." },
+            { de: "Zum Frühstück hätte ich gern ein Ei und eine Milch.", en: "For breakfast, I would like an egg and a milk." },
+            { de: "Zum Frühstück esse ich nicht gern eine Wurst, denn sie ist salzig.", en: "For breakfast, I do not like eating sausage because it is salty." },
+            { de: "Zum Frühstück trinke ich nicht gern einen Kaffee, denn er schmeckt ekelhaft.", en: "For breakfast, I do not like drinking coffee because it tastes disgusting." },
+            { de: "Zum Mittagessen esse ich gern eine Pizza, denn sie ist lecker.", en: "For lunch, I like eating pizza because it is tasty." },
+            { de: "Zum Mittagessen esse ich gern Pommes, denn sie sind salzig.", en: "For lunch, I like eating chips because they are salty." },
+            { de: "Zum Mittagessen esse ich gern Nudeln, denn sie schmecken gut.", en: "For lunch, I like eating pasta because it tastes good." },
+            { de: "Zum Mittagessen esse ich gern Reis, denn er schmeckt gut.", en: "For lunch, I like eating rice because it tastes good." },
+            { de: "Zum Mittagessen esse ich gern ein Hähnchen, denn es ist köstlich.", en: "For lunch, I like eating chicken because it is delicious." },
+            { de: "Zum Mittagessen esse ich gern Gemüse, denn es ist gesund.", en: "For lunch, I like eating vegetables because they are healthy." },
+            { de: "Zum Mittagessen esse ich nicht gern einen Fisch, denn er schmeckt ekelhaft.", en: "For lunch, I do not like eating fish because it tastes disgusting." },
+            { de: "Zum Mittagessen esse ich nicht gern eine Gurke, denn sie schmeckt nicht gut.", en: "For lunch, I do not like eating cucumber because it does not taste good." },
+            { de: "Zum Mittagessen nehme ich einen Salat und ein Wasser.", en: "For lunch, I will have a salad and a water." },
+            { de: "Zum Mittagessen hätte ich gern eine Suppe und ein Brötchen.", en: "For lunch, I would like a soup and a bread roll." },
+            { de: "Zum Abendessen esse ich gern Bratkartoffeln, denn sie schmecken gut.", en: "For dinner, I like eating fried potatoes because they taste good." },
+            { de: "Zum Abendessen esse ich gern eine Kartoffel, denn sie ist lecker.", en: "For dinner, I like eating a potato because it is tasty." },
+            { de: "Zum Abendessen esse ich gern eine Tomate, denn sie ist frisch.", en: "For dinner, I like eating a tomato because it is fresh." },
+            { de: "Zum Abendessen esse ich gern einen Schinken, denn er ist salzig.", en: "For dinner, I like eating ham because it is salty." },
+            { de: "Zum Abendessen esse ich gern einen Käse, denn er ist köstlich.", en: "For dinner, I like cheese because it is delicious." },
+            { de: "Zum Abendessen esse ich nicht gern eine Paprika, denn sie ist scharf.", en: "For dinner, I do not like eating pepper because it is spicy." },
+            { de: "Zum Abendessen esse ich nicht gern Fleisch, denn es schmeckt nicht gut.", en: "For dinner, I do not like eating meat because it does not taste good." },
+            { de: "Zum Abendessen trinke ich lieber ein Wasser, denn es ist gesund.", en: "For dinner, I prefer drinking water because it is healthy." },
+            { de: "Zum Abendessen nehme ich eine Pizza und eine Cola.", en: "For dinner, I will have a pizza and a coke." },
+            { de: "Zum Abendessen hätte ich gern einen Kuchen und einen Kaffee.", en: "For dinner, I would like a cake and a coffee." }
+        ];
+
+        // Colour configuration for teams
+        const playerColours = ['blue', 'purple', 'amber'];
+        const playerNames = ['Blaues Team', 'Lila Team', 'Gold Team'];
+
+        let players = [];
+        let currentPlayerIndex = 0;
+        let currentPair = null;
+        let canDig = false;
+        let gridData = [];
+        const gridSize = 64; 
+        let timeLeft = 300; 
+        let timerInterval = null;
+
+        // Web Speech API check and initialisation
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition = null;
+        let isRecognitionActive = false;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'de-DE';
+            recognition.interimResults = false;
+            
+            recognition.onstart = () => {
+                isRecognitionActive = true;
+                document.getElementById('mic-btn').classList.add('animate-pulse');
+                document.getElementById('speech-status').innerText = "Ich höre zu...";
+            };
+
+            recognition.onresult = (event) => {
+                const speechResult = event.results[0][0].transcript;
+                const input = document.getElementById('answer-input');
+                input.value = speechResult;
+                document.getElementById('speech-status').innerText = "Sprechen fertig! Jetzt korrigieren oder prüfen.";
+                unlockInput();
+            };
+            
+            recognition.onerror = () => {
+                isRecognitionActive = false;
+                document.getElementById('mic-btn').classList.remove('animate-pulse');
+                document.getElementById('speech-status').innerText = "Nicht verstanden. Du kannst jetzt tippen.";
+                unlockInput(); 
+            };
+            
+            recognition.onend = () => {
+                isRecognitionActive = false;
+                document.getElementById('mic-btn').classList.remove('animate-pulse');
+                // Auto-unlock even if silence to prevent getting stuck
+                setTimeout(unlockInput, 500);
+            };
+        }
+
+        /**
+         * Unlocks the text input after microphone attempt.
+         * Forces the workflow: Speak -> Correct/Edit -> Submit.
+         */
+        function unlockInput() {
+            const input = document.getElementById('answer-input');
+            const submitBtn = document.getElementById('submit-btn');
+            const lockOverlay = document.getElementById('input-lock-overlay');
+            const micBtn = document.getElementById('mic-btn');
+
+            input.disabled = false;
+            input.classList.remove('bg-slate-50');
+            submitBtn.disabled = false;
+            lockOverlay.classList.add('hidden');
+            micBtn.classList.remove('mic-highlight');
+            input.focus();
+        }
+
+        function startGame(count) {
+            players = [];
+            for (let i = 0; i < count; i++) {
+                players.push({ id: i, name: playerNames[i], score: 0, color: playerColours[i] });
+            }
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            initialiseGrid();
+            updatePlayerBoard();
+            startTimer();
+            startNewRound();
+        }
+
+        function startTimer() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const display = document.getElementById('timer-display');
+            const minutes = Math.floor(timeLeft / 60);
+            const seconds = timeLeft % 60;
+            display.innerText = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            if (timeLeft <= 30) display.classList.add('timer-low');
+        }
+
+        /**
+         * Initialises the digging grid with treasures, traps, and junk items.
+         */
+        function initialiseGrid() {
+            const gridContainer = document.getElementById('treasure-grid');
+            const rewardTypes = [
+                { icon: '💰', min: 2, max: 8, label: 'Münzen' },   
+                { icon: '💍', min: 10, max: 15, label: 'Ring' }, 
+                { icon: '💎', min: 20, max: 30, label: 'Edelstein' }, 
+                { icon: '👑', min: 40, max: 60, label: 'Krone' }, 
+                { icon: '✨', min: 1, max: 5, label: 'Sternenstaub' },   
+                { icon: '🦴', min: -5, max: -2, label: 'Knochen' }, 
+                { icon: '💩', min: -8, max: -4, label: 'Mist' }, 
+                { icon: '❌', min: -15, max: -10, label: 'Gefahr' },
+                { icon: '👟', min: 0, max: 1, label: 'Alter Schuh' }, 
+                { icon: '🥫', min: 0, max: 1, label: 'Alte Dose' }    
+            ];
+
+            let tempRewards = [];
+            // Treasure distribution
+            for(let i = 0; i < 4; i++) tempRewards.push({...rewardTypes[0]}); 
+            for(let i = 0; i < 3; i++) tempRewards.push({...rewardTypes[1]}); 
+            for(let i = 0; i < 2; i++) tempRewards.push({...rewardTypes[2]}); 
+            for(let i = 0; i < 1; i++) tempRewards.push({...rewardTypes[3]}); 
+            for(let i = 0; i < 4; i++) tempRewards.push({...rewardTypes[4]}); 
+            // Trap distribution
+            for(let i = 0; i < 3; i++) tempRewards.push({...rewardTypes[5]}); 
+            for(let i = 0; i < 2; i++) tempRewards.push({...rewardTypes[6]}); 
+            for(let i = 0; i < 2; i++) tempRewards.push({...rewardTypes[7]}); 
+            // Junk distribution
+            for(let i = 0; i < 12; i++) tempRewards.push({...rewardTypes[8]}); 
+            for(let i = 0; i < 12; i++) tempRewards.push({...rewardTypes[9]}); 
+
+            // Fill remaining tiles with empty holes
+            while(tempRewards.length < gridSize) {
+                tempRewards.push({ icon: '🕳️', min: 0, max: 0, label: 'Nichts' });
+            }
+            
+            // Randomise location and individual point values
+            gridData = tempRewards.sort(() => Math.random() - 0.5).map(item => {
+                const pts = Math.floor(Math.random() * (item.max - item.min + 1)) + item.min;
+                return { icon: item.icon, points: pts, label: item.label };
+            });
+            
+            gridContainer.innerHTML = '';
+            for (let i = 0; i < gridSize; i++) {
+                const tile = document.createElement('div');
+                tile.className = 'grid-tile bg-orange-200 border-2 border-orange-300 rounded-lg cursor-pointer h-14 md:h-16 flex items-center justify-center text-2xl md:text-3xl shadow-inner';
+                tile.id = `tile-${i}`;
+                tile.onclick = () => handleDig(i);
+                gridContainer.appendChild(tile);
+            }
+        }
+
+        function updatePlayerBoard() {
+            const board = document.getElementById('player-board');
+            board.innerHTML = players.map((p, idx) => `
+                <div class="p-3 rounded-xl border-2 transition-all ${idx === currentPlayerIndex ? `active-player bg-white shadow-md` : 'bg-slate-100 opacity-60'}">
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-${p.color}-600">${p.name}</span>
+                        <span class="bg-${p.color}-500 text-white px-2 py-0.5 rounded-full text-xs font-bold">${p.score} Pkt.</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function startNewRound() {
+            canDig = false;
+            document.getElementById('continue-btn').classList.add('hidden');
+            
+            const input = document.getElementById('answer-input');
+            const submitBtn = document.getElementById('submit-btn');
+            const lockOverlay = document.getElementById('input-lock-overlay');
+            const micBtn = document.getElementById('mic-btn');
+
+            input.value = '';
+            input.disabled = true;
+            input.classList.add('bg-slate-50');
+            submitBtn.disabled = true;
+            lockOverlay.classList.remove('hidden');
+            micBtn.classList.add('mic-highlight');
+
+            document.getElementById('feedback-area').innerHTML = '<p class="text-slate-400 italic text-sm">Nutze zuerst das Mikrofon!</p>';
+            document.getElementById('speech-status').innerText = "Warte auf Stimme...";
+            document.getElementById('grid-status-text').innerText = "Warte auf Stimme...";
+            document.getElementById('dig-count').innerText = "";
+            
+            currentPair = sentencePairs[Math.floor(Math.random() * sentencePairs.length)];
+            document.getElementById('english-sentence').innerText = currentPair.en;
+            updatePlayerBoard();
+        }
+
+        function startSpeech() {
+            if (!recognition || isRecognitionActive) return;
+            recognition.start();
+        }
+
+        /**
+         * Normalises strings for comparison:
+         * - Strips punctuation
+         * - Standardises gern/gerne
+         * - Ignores articles (ein, eine, einen)
+         * - Standardises "denn er/sie/es ist/sind" phrases
+         */
+        function normalise(str) {
+            return str.toLowerCase()
+                .replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, "")
+                .replace(/gerne/g, "gern")
+                .replace(/\b(ein|eine|einen)\b/g, "")
+                .replace(/\bdenn (er|sie|es|sie) (ist|sind)\b/g, "denn ist")
+                .replace(/\s+/g, " ")
+                .trim();
+        }
+
+        function checkAnswer() {
+            const inputVal = document.getElementById('answer-input').value;
+            const normInput = normalise(inputVal);
+            const normCorrect = normalise(currentPair.de);
+            
+            const isCorrect = (normInput === normCorrect);
+            const feedback = document.getElementById('feedback-area');
+            
+            document.getElementById('answer-input').disabled = true;
+            document.getElementById('submit-btn').disabled = true;
+            document.getElementById('mic-btn').disabled = true;
+
+            if (isCorrect) {
+                feedback.innerHTML = `
+                    <div class="text-green-600 font-bold mb-2 text-xl">✅ RICHTIG!</div>
+                    <div class="text-slate-700 bg-green-50 p-3 rounded-lg border border-green-200 w-full text-left">
+                        <p class="text-[10px] uppercase text-green-500 font-black mb-1">Deine Antwort:</p>
+                        <p class="font-bold">${inputVal || "—"}</p>
+                    </div>
+                `;
+                canDig = true;
+                document.getElementById('grid-status-text').innerText = "Korrekt! Grabe jetzt!";
+                document.getElementById('dig-count').innerText = "👉 Klick auf ein Feld!";
+            } else {
+                feedback.innerHTML = `
+                    <div class="text-red-600 font-bold mb-2 text-xl">❌ NICHT GANZ...</div>
+                    <div class="space-y-2 text-left w-full">
+                        <div class="bg-red-50 p-2 rounded border border-red-100">
+                            <p class="text-[10px] uppercase text-red-400 font-black">Deine Eingabe:</p>
+                            <p class="text-sm italic text-slate-600">${inputVal || "(leer)"}</p>
+                        </div>
+                        <div class="bg-blue-50 p-2 rounded border border-blue-100">
+                            <p class="text-[10px] uppercase text-blue-500 font-black">Richtige Lösung:</p>
+                            <p class="text-sm font-bold text-slate-800">${currentPair.de}</p>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('continue-btn').classList.remove('hidden');
+                document.getElementById('grid-status-text').innerText = "Leider falsch.";
+            }
+        }
+
+        function handleDig(index) {
+            if (!canDig) return;
+            const tile = document.getElementById(`tile-${index}`);
+            if (tile.classList.contains('revealed')) return;
+
+            const content = gridData[index];
+            tile.classList.add('revealed');
+            tile.classList.remove('bg-orange-200', 'cursor-pointer');
+            tile.classList.add('bg-white', 'treasure-reveal', 'border-slate-100');
+            
+            tile.innerText = content.icon;
+            players[currentPlayerIndex].score += content.points;
+            updatePlayerBoard();
+            
+            canDig = false;
+            let resultText = "";
+            if (content.icon === '🕳️') {
+                resultText = "Nichts gefunden...";
+            } else if (content.points > 0) {
+                resultText = `${content.label}: +${content.points} Punkte!`;
+            } else if (content.points < 0) {
+                resultText = `${content.label}: ${content.points} Punkte!`;
+            } else {
+                resultText = `${content.label}: 0 Punkte.`;
+            }
+            
+            document.getElementById('dig-count').innerText = resultText;
+            document.getElementById('continue-btn').classList.remove('hidden');
+
+            if (isGridFull()) endGame();
+        }
+
+        function nextTurn() {
+            currentPlayerIndex = (currentPlayerIndex + 1) % players.length;
+            startNewRound();
+        }
+
+        function isGridFull() {
+            return document.querySelectorAll('.grid-tile:not(.revealed)').length === 0;
+        }
+
+        function endGame() {
+            if (timerInterval) clearInterval(timerInterval);
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('finish-screen').classList.remove('hidden');
+            const ranking = [...players].sort((a, b) => b.score - a.score);
+            const rankingList = document.getElementById('final-ranking');
+            rankingList.innerHTML = ranking.map((p, i) => `
+                <div class="flex items-center justify-between bg-white p-4 rounded-xl border-2 border-${p.color}-200 shadow-sm">
+                    <span class="text-2xl font-bold">${i + 1}. ${p.name}</span>
+                    <span class="text-xl font-bold text-green-600">${p.score} Punkte</span>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
